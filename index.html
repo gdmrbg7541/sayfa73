@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Arapça Hafıza Oyunu</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+        html { font-size: clamp(12px, 1.2vw, 16px); }
+
+        :root {
+            --bg-start: #f7f9fc; --bg-end: #e8eef5; --primary-color: #5E81AC; --accent-color: #f7b733; --surface-color: #FFFFFF; --text-color: #2e3440; --text-light-color: #FFFFFF; --player1-color: #64a7fa; --player2-color: #f77d7d; --correct-color: #2ddc73; --incorrect-color: #f24c4c; --shadow-light: rgba(46, 52, 64, 0.07); --shadow-medium: rgba(46, 52, 64, 0.12); --border-radius-sm: 8px; --border-radius-md: 12px; --border-radius-lg: 16px;
+            --button-bg: var(--surface-color); --button-shadow: 0 3px #d8dee9; --button-hover-bg: #eceff4; --button-selected-bg: var(--primary-color); --button-selected-color: var(--text-light-color); --button-selected-shadow: 0 0 0 3px var(--accent-color);
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        html, body { 
+            width: 100%; 
+            height: 100%; 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+        }
+
+        /* DEĞİŞTİ: Yazı tipi Noto Naskh Arabic olarak ayarlandı */
+        body { 
+            font-family: 'Noto Naskh Arabic', serif; 
+            background-color: var(--bg-start); 
+            background-image: linear-gradient(180deg, var(--bg-start) 0%, var(--bg-end) 100%); 
+            color: var(--text-color); 
+            text-align: center; 
+            text-rendering: optimizeLegibility; 
+        }
+        button, input, select { font-family: inherit; }
+
+        /* --- DÜZELTME 1: 16:9 KİLİDİ KALDIRILDI (Tam Ekran) --- */
+        #game-wrapper { 
+            width: 100%;  /* YENİ: Ebeveyni (body) kadar genişle */
+            height: 100%; /* YENİ: Ebeveyni (body) kadar yüksel */
+            
+            position: relative; 
+            margin: auto; 
+            overflow: hidden; 
+        }
+        /* --------------------------------------------------- */
+
+        .screen { display: none; width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; position: absolute; top: 0; left: 0; transition: opacity 0.5s; overflow-y: auto; padding: 20px; }
+        .screen.active { display: flex; }
+        
+        .header-navigation { position: absolute; top: 10px; left: 10px; z-index: 200; }
+        .back-btn { background: none; border: none; cursor: pointer; padding: 5px; }
+        .back-btn svg { width: 35px; height: 35px; fill: var(--text-color); transition: all 0.2s; opacity: 0.8; filter: drop-shadow(0 1px 2px var(--shadow-light)); }
+        .back-btn:hover svg { opacity: 1; transform: scale(1.1); }
+        .hidden { display: none !important; }
+
+        #game-screen { 
+            flex-direction: row; 
+            justify-content: space-between; 
+            padding: 15px; 
+            align-items: stretch; /* Kutuların dikeyde dolmasını sağlar */
+            overflow: hidden; 
+            gap: 15px; 
+        }
+        #game-screen.single-player-mode #player2-display { display: none; } 
+        #game-screen.single-player-mode #player1-display { 
+            margin-top: 20px; 
+            margin-bottom: 20px;
+            margin-left: auto;
+            margin-right: auto;
+        } 
+
+        .score-display { 
+            flex: 0 0 clamp(100px, 15%, 150px); 
+            max-width: 150px; 
+            height: auto; 
+            margin-top: 20px; 
+            margin-bottom: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            gap: clamp(10px, 3vh, 20px); 
+            font-size: clamp(2.5rem, 5vw, 4rem); 
+            font-weight: bold; 
+            transition: all 0.4s ease; 
+            opacity: 0.9; 
+            border-radius: var(--border-radius-lg); 
+            color: var(--text-light-color); 
+            border: none; 
+        }
+        
+        #player1-display { background: linear-gradient(180deg, var(--player1-color), #4e8dff); }
+        #player2-display { background: linear-gradient(180deg, var(--player2-color), #f55a5a); }
+        .score-display svg { width: clamp(40px, 10vw, 80px); height: clamp(40px, 10vw, 80px); fill: rgba(255,255,255,0.9); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));}
+        .score-display.active { opacity: 1; transform: scale(1.05); } 
+        #player1-display.active { /* Gerekirse özel stil */ }
+        #player2-display.active { /* Gerekirse özel stil */ }
+
+        /* --- DÜZELTME 2: YATAY TAŞMA İÇİN 'height: 100%' KALDIRILDI --- */
+        /* --- GÜNCELLENDİ: 6 SÜTUN, 4 SATIR (Masaüstü) --- */
+        #game-board { 
+            flex-grow: 1; 
+            width: auto; 
+            margin: 0; 
+            padding: 0; 
+            display: grid; 
+            gap: clamp(6px, 1vw, 12px); 
+            perspective: 1200px; 
+            grid-template-columns: repeat(6, 1fr); /* İSTEK: 6 sütun */
+            grid-template-rows: repeat(4, 1fr);   /* İSTEK: 4 satır */
+            /* height: 100%; (Bu satır taşmaya neden oluyordu, kaldırıldı) */
+        }
+        /* ----------------------------------------------------------- */
+
+        .card { background-color: transparent; cursor: pointer; container-type: inline-size; }
+        .card-inner { 
+            position: relative; 
+            width: 100%; 
+            height: 100%; 
+            transition: transform 0.6s; 
+            transform-style: preserve-3d; 
+            
+            /* --- YENİ EKLENEN SATIR --- */
+            will-change: transform; 
+            /* ------------------------- */
+        }
+        .card.flipped .card-inner { transform: rotateY(180deg); }
+        
+        .card-face { 
+            position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: var(--border-radius-md); display: flex; justify-content: center; align-items: center; padding: clamp(4px, 1cqw, 8px); word-break: break-word; 
+            font-size: clamp(2rem, 22cqw, 5rem); 
+            text-align: center; line-height: 1.1; 
+        }
+        
+        .card-back.image-card {
+            padding: 0; 
+        }
+        .card-back.image-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; 
+            border-radius: inherit; 
+        }
+        
+        .card-front { background-color: var(--surface-color); box-shadow: 0 2px 8px var(--shadow-light); }
+        .card-back { 
+            color: var(--text-light-color); /* DEĞİŞTİ (Yazı rengi koyu yapıldı) */
+            transform: rotateY(180deg); 
+            background-color: var(--surface-color); /* DEĞİŞTİ (Arka plan beyaz yapıldı) */
+        }
+        .card.p1-turn .card-back { background-color: var(--player1-color); }
+        .card.p2-turn .card-back { background-color: var(--player2-color); }
+        .card.p1-match .card-face.card-back { background-color: var(--player1-color); }
+        .card.p2-match .card-face.card-back { background-color: var(--player2-color); }
+
+        .game-over-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: var(--surface-color); padding: 30px 50px; border-radius: var(--border-radius-lg); border: none; z-index: 200; display: flex; flex-direction: column; align-items: center; gap: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        .game-over-overlay h2 { font-size: clamp(1.8rem, 4vw, 2.5rem); margin: 0; }
+        #winner-icon-container { display: flex; justify-content: center; gap: 10px; }
+        #winner-icon-container svg { width: clamp(50px, 10vw, 80px); height: clamp(50px, 10vw, 80px); }
+        #memory-win-text.p1-win { color: var(--player1-color); }
+        #winner-icon-container.p1-win svg { fill: var(--player1-color); }
+        #memory-win-text.p2-win { color: var(--player2-color); }
+        #winner-icon-container.p2-win svg { fill: var(--player2-color); }
+        #memory-win-text.draw { color: var(--accent-color); }
+        #winner-icon-container.draw svg { width: clamp(40px, 8vw, 60px); height: clamp(40px, 8vw, 60px); }
+        #winner-icon-container.draw svg:first-child { fill: var(--player1-color); }
+        #winner-icon-container.draw svg:last-child { fill: var(--player2-color); }
+
+        .win-buttons { display: flex; gap: 30px; margin-top: 15px; }
+        .win-buttons .icon-btn { background-color: transparent; border: none; cursor: pointer; transition: all 0.3s ease; padding: 5px;}
+        .win-buttons .icon-btn:hover { transform: scale(1.1); }
+        .win-buttons .icon-btn svg { width: clamp(40px, 8vw, 56px); height: clamp(40px, 8vw, 56px); fill: var(--primary-color); }
+        .win-buttons .icon-btn:hover svg { fill: var(--accent-color); }
+
+        @keyframes pulse-glow { 0%, 100% { transform: scale(1); filter: drop-shadow(0 0 5px rgba(94, 129, 172, 0.2)); } 50% { transform: scale(1.05); filter: drop-shadow(0 0 20px rgba(94, 129, 172, 0.6));} }
+        
+
+        /* --- Media Queries --- */
+        @media (max-width: 800px) {
+             #game-screen { 
+                 flex-direction: column; padding: 10px; gap: 10px; 
+                 align-items: stretch; 
+            }
+             .score-display { 
+                 flex-direction: row; height: auto; width: 100%; max-width: none; font-size: 2rem; padding: 5px 10px; gap: 10px; order: -1; flex: 0 0 auto;
+                 margin-top: 0; 
+                 margin-bottom: 0; 
+             }
+             .score-display svg { width: 30px; height: 30px; }
+             
+             /* --- İSTEDİĞİNİZ MOBİL DÜZEN (GÜNCELLENDİ) --- */
+             #game-board { 
+                 flex-grow: 1; 
+                 margin: 0; 
+                 grid-template-columns: repeat(4, 1fr); /* İSTEK: 4 SÜTUN */
+                 grid-template-rows: repeat(6, 1fr);   /* İSTEK: 6 SATIR */
+                 gap: 6px; 
+                 width: 100%; 
+             }
+             /* --------------------------------- */
+
+             .card-face { font-size: clamp(1.5rem, 18cqw, 2.8rem); padding: 4px; border-radius: var(--border-radius-sm);}
+             .game-over-overlay { padding: 20px 30px; width: 90%; }
+             .win-buttons { gap: 25px;}
+             .win-buttons .icon-btn svg { width: 44px; height: 44px; }
+        }
+        
+        /* GÜNCELLENDİ: Yatayda 6 sütun 4 satır */
+        @media (max-height: 500px) and (orientation: landscape){
+            #game-screen { 
+                gap: 8px; padding: 8px; 
+                align-items: stretch; 
+            }
+            .score-display { 
+                flex: 0 0 clamp(80px, 12%, 120px); gap: 5px; 
+                margin-top: 20px; 
+                margin-bottom: 20px; 
+                height: auto; 
+            }
+            .score-display svg { width: 30px; height: 30px; }
+            #game-board { 
+                gap: 4px;
+                grid-template-columns: repeat(6, 1fr); /* İSTEK: 6 sütun */
+                grid-template-rows: repeat(4, 1fr);   /* İSTEK: 4 satır */
+            }
+            .card-face { font-size: clamp(1.3rem, 15cqw, 2.2rem); padding: 2px;}
+        }
+
+
+        /* Font Aileleri - DEĞİŞTİ: Noto Naskh Arabic */
+        html, body { font-family: 'Noto Naskh Arabic', serif !important; }
+        
+        .card-back[dir="rtl"] { 
+            font-family: 'Noto Naskh Arabic', serif !important; 
+        }
+        
+        button, h1, h2, h3, .score-display, label, select { 
+            font-family: 'Noto Naskh Arabic', serif !important; 
+        }
+
+</style>
+</head>
+<body>
+<div id="game-wrapper">
+    <div class="screen active" id="game-screen">
+        </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+    // --- YENİ DATA MODÜLÜ (GÜNCELLENDİ - 12 ÇİFT) ---
+    // !!! LÜTFEN 'word' KISIMLARINI KENDİ KELİMELERİNİZLE GÜNCELLEYİN !!!
+    const gameData = [
+        { id: 1, img: '1.jpeg', word: 'فُلْفُل' },
+        { id: 2, img: '2.jpeg', word: 'تُفّاح' },
+        { id: 3, img: '3.jpeg', word: 'طَماطِم' },
+        { id: 4, img: '4.jpeg', word: 'جَزَر' },
+        { id: 5, img: '5.jpeg', word: 'مِشْمِش' },
+        { id: 6, img: '6.jpeg', word: 'مَوْز' },
+        { id: 7, img: '7.jpeg', word: 'باذِنْجان' },
+        { id: 8, img: '8.jpeg', word: 'بُرْتُقال' },
+        { id: 9, img: '9.jpeg', word: 'خِيار' },
+        { id: 10, img: '10.jpeg', word: 'بَصَل' },
+        { id: 11, img: '11.jpeg', word: 'عِنَب' },
+        { id: 12, img: '12.jpeg', word: 'بِطّيخ' }
+    ];
+
+    // --- UTILS MODULE ---
+    const Utils = { shuffleArray: (arr) => [...arr].sort(() => 0.5 - Math.random()) };
+
+    // --- APP MODULE (Sadeleştirildi) ---
+    const App = {
+        state: {
+            isAudioInitialized: false,
+            audioCtx: null,
+        },
+        dom: {
+            screens: document.querySelectorAll('.screen'),
+            gameScreen: document.getElementById('game-screen'),
+        },
+        
+        // --- DEĞİŞTİRİLDİ ---
+        init() {
+            MemoryGame.init();
+
+            // Yükleme sırasında kullanıcıya geri bildirim ver
+            if (this.dom.gameScreen) {
+                // "Yükleniyor..." metni eklendi
+                this.dom.gameScreen.innerHTML = '<h2 style="font-family: \'Noto Naskh Arabic\', serif; color: var(--text-color);">Yükleniyor...</h2>';
+            }
+
+            const initAudioOnFirstInteraction = () => {
+                if (this.state.isAudioInitialized) return; 
+                this.initAudio(); 
+                document.removeEventListener('click', initAudioOnFirstInteraction);
+                document.removeEventListener('touchstart', initAudioOnFirstInteraction);
+            };
+            document.addEventListener('click', initAudioOnFirstInteraction);
+            document.addEventListener('touchstart', initAudioOnFirstInteraction);
+            
+            // YENİ KOD:
+            // Önce görselleri yükle, yükleme bittiğinde oyunu başlat
+            this.preloadGameImages(gameData).then(() => {
+                console.log("Tüm görseller yüklendi, oyun başlıyor.");
+                // Yükleniyor... mesajını temizleyip oyunu başlat
+                MemoryGame.start(gameData, 1); 
+            }).catch(err => {
+                console.error("Görsel yükleme sırasında bir hata oluştu:", err);
+                // Bir hata olsa bile oyunu başlatmayı dene
+                MemoryGame.start(gameData, 1);
+            });
+        },
+        
+        initAudio() { 
+            if (this.state.isAudioInitialized) return; 
+
+            try { 
+                if (!this.state.audioCtx) { 
+                    this.state.audioCtx = new (window.AudioContext || window.webkitAudioContext)(); 
+                }
+                
+                if (this.state.audioCtx.state === 'suspended') { 
+                    this.state.audioCtx.resume(); 
+                } 
+                
+                this.state.isAudioInitialized = true; 
+            
+            } catch (e) { 
+                console.error("Web Audio API desteklenmiyor."); 
+                this.state.isAudioInitialized = false; 
+            } 
+        },
+        
+        // SES SEVİYESİ 0.2 OLARAK AYARLI
+        playSound(soundKey) { 
+            if (!this.state.isAudioInitialized || !this.state.audioCtx) {
+                return;
+            }
+            if (this.state.audioCtx.state === 'suspended') {
+                this.state.audioCtx.resume();
+            }
+            if (this.state.audioCtx.state !== 'running') {
+                return;
+            }
+
+            const sounds = { 
+                flip: { f: 200, t: 'triangle', d: 0.1 }, 
+                match: { f: 440, t: 'sine', d: 0.2 }, 
+                menuClick: { f: 600, t: 'square', d: 0.08 }, 
+                touch: { f: 300, t: 'sine', d: 0.05 }, 
+                correct: { f: 523.25, t: 'sine', d: 0.2 }, 
+                incorrect: { f: 164.81, t: 'square', d: 0.2 }, 
+                countdown: { f: 880, t: 'sine', d: 0.15 } 
+            }; 
+            const sound = sounds[soundKey]; 
+            if (!sound) return; 
+            const g = this.state.audioCtx.createGain(); 
+            g.connect(this.state.audioCtx.destination); 
+            g.gain.setValueAtTime(0, this.state.audioCtx.currentTime); 
+            
+            g.gain.linearRampToValueAtTime(0.2, this.state.audioCtx.currentTime + 0.01); 
+            
+            g.gain.linearRampToValueAtTime(0, this.state.audioCtx.currentTime + sound.d); 
+            const o = this.state.audioCtx.createOscillator(); 
+            o.type = sound.t; 
+            o.frequency.value = sound.f; 
+            o.connect(g); 
+            o.start(0); 
+            o.stop(this.state.audioCtx.currentTime + sound.d); 
+        },
+
+        // --- YENİ EKLENDİ ---
+        preloadGameImages(data) {
+            const promises = data.map(item => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.src = item.img;
+                    // Yüklendiğinde veya hata verdiğinde promise'i çöz
+                    img.onload = () => resolve(img);
+                    img.onerror = () => {
+                        console.error(`Görsel yüklenemedi: ${item.img}`);
+                        resolve(null); // Hata olsa bile oyunun başlamasına izin ver
+                    };
+                });
+            });
+            // Tüm görsellerin yüklenmesini bekle
+            return Promise.all(promises);
+        },
+    };
+
+    // --- MEMORY GAME MODULE (Görsel ve Data için Güncellendi) ---
+    const MemoryGame = {
+        screenId: 'game-screen',
+        state: { playerMode: 1 }, 
+        dom: {}, 
+        init() { /* Genel listenerlar buraya (varsa) */ },
+        start(words, playerMode = 1) {
+            this.state = { f: [], p: 0, l: false, c: 1, s1: 0, s2: 0, w: [], flipTimeout: null, playerMode: playerMode };
+
+            const gameScreen = document.getElementById('game-screen');
+            if (!gameScreen) return;
+            
+            // DEĞİŞİKLİK: Oyun sonu ekranı HTML'inden metin (h2) ve ikon (div) kaldırıldı.
+            // "Yükleniyor..." metni de buradan temizlenmiş oluyor.
+            gameScreen.innerHTML = `
+                <div class="score-display" id="player1-display"> <svg viewBox="0 0 24 24"><path d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z"></path></svg> <span id="score1">0</span> </div>
+                <div id="game-board"></div>
+                <div class="score-display" id="player2-display"> <svg viewBox="0 0 24 24"><path d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z"></path></svg> <span id="score2">0</span> </div>
+                <div class="game-over-overlay hidden" id="memory-game-over"> <div class="win-buttons"> <button class="icon-btn" id="play-again-memory-btn" title="Tekrar Oyna"><svg viewBox="0 0 24 24"><path d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"></path></svg></button> </div> </div>`;
+
+            this.dom.board = document.getElementById('game-board'); 
+            this.dom.p1Display = document.getElementById('player1-display'); 
+            this.dom.p2Display = document.getElementById('player2-display'); 
+            this.dom.score1 = document.getElementById('score1'); 
+            this.dom.score2 = document.getElementById('score2'); 
+            this.dom.gameOverContainer = document.getElementById('memory-game-over'); 
+            
+            // DEĞİŞİKLİK: Kaldırılan elementlerin referansları silindi.
+            // this.dom.winText = document.getElementById('memory-win-text'); 
+            // this.dom.winnerIcon = document.getElementById('winner-icon-container');
+
+            document.getElementById('play-again-memory-btn').onclick = () => { 
+                App.playSound('menuClick'); 
+                // Tekrar oynarken de görseller zaten yüklü olduğu için hızlıca başlar
+                this.start(gameData, this.state.playerMode); 
+            };
+
+            gameScreen.classList.toggle('single-player-mode', this.state.playerMode === 1);
+
+            // GÜNCELLENDİ: 10 yerine 12 çift alıyor
+            const wordPairsNeeded = Math.min(12, Math.floor(words.length)); 
+            if (wordPairsNeeded < 2) {
+                 console.error("Hafıza oyunu için yeterli çift yok:", words);
+                 return;
+             }
+
+            this.state.w = Utils.shuffleArray(words).slice(0, wordPairsNeeded); 
+            
+            // 'undefined' hatası için düzeltilmiş satır (w.word olmalı)
+            const pairs = this.state.w.flatMap(w => [
+                { type: 'img', content: w.img, id: w.id }, 
+                { type: 'word', content: w.word, id: w.id, lang: 'ar' }
+            ]);
+            
+            this.populateBoard(Utils.shuffleArray(pairs)); 
+
+            this.dom.score1.textContent = '0';
+            this.dom.score2.textContent = '0';
+            this.dom.gameOverContainer.classList.add('hidden');
+            this.updateTurnIndicator();
+        },
+        stop() { if (this.state.flipTimeout) clearTimeout(this.state.flipTimeout); this.state.flipTimeout = null; },
+        
+        populateBoard(cards) { 
+            if (!this.dom.board) return; 
+            this.dom.board.innerHTML = ''; 
+            
+            /* DİNAMİK SATIR/SÜTUN ATAMASI KALDIRILDI, ARTIK CSS YAPIYOR */
+            
+            cards.forEach(cardData => { 
+                const cardEl = document.createElement('div'); 
+                cardEl.className = 'card'; 
+                cardEl.dataset.id = cardData.id; 
+
+                let cardBackContent = '';
+                let cardBackClass = 'card-face card-back';
+                let cardStyle = '';
+                let cardDir = 'rtl'; 
+
+                if (cardData.type === 'img') {
+                    cardBackContent = `<img src="${cardData.content}" alt="Eşleştirme Resmi">`;
+                    cardBackClass += ' image-card'; 
+                    cardDir = 'ltr';
+                    cardStyle = "padding: 0;"; 
+                } else { 
+                    cardBackContent = cardData.content;
+                    cardDir = 'rtl';
+                }
+
+                cardEl.innerHTML = `<div class="card-inner">
+                                        <div class="card-face card-front"></div>
+                                        <div class="${cardBackClass}" dir="${cardDir}" style="${cardStyle}">
+                                            ${cardBackContent}
+                                        </div>
+                                    </div>`; 
+                cardEl.onclick = () => this.flipCard(cardEl); 
+                this.dom.board.appendChild(cardEl); 
+            }); 
+        },
+
+        flipCard(card) {
+            if (this.state.l || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+            App.playSound('flip'); card.classList.add('flipped');
+            if (this.state.playerMode === 2) { card.classList.add(this.state.c === 1 ? 'p1-turn' : 'p2-turn'); }
+            else { card.classList.add('p1-turn'); } 
+
+            this.state.f.push(card);
+            if (this.state.f.length === 2) {
+                this.state.l = true; const [c1, c2] = this.state.f;
+                if (c1.dataset.id === c2.dataset.id) {
+                    App.playSound('match'); let matchClass = 'p1-match'; 
+                    if (this.state.playerMode === 1) { this.dom.score1.textContent = ++this.state.s1; }
+                    else { 
+                        matchClass = this.state.c === 1 ? 'p1-match' : 'p2-match';
+                        if (this.state.c === 1) this.dom.score1.textContent = ++this.state.s1; else this.dom.score2.textContent = ++this.state.s2;
+                    }
+                    this.state.f.forEach(c => { c.classList.remove('p1-turn', 'p2-turn'); c.classList.add('matched', matchClass); });
+                    this.state.p++; this.state.f = []; this.state.l = false;
+                    
+                    if (this.state.p === this.state.w.length) { 
+                         setTimeout(() => {
+                             this.showEndUI();
+                         }, 700);
+                     }
+                } else {
+                    if (this.state.flipTimeout) clearTimeout(this.state.flipTimeout);
+                    this.state.flipTimeout = setTimeout(() => {
+                        this.state.f.forEach(c => { c.classList.remove('flipped', 'p1-turn', 'p2-turn'); }); this.state.f = [];
+                        if (this.state.playerMode === 2) { this.state.c = this.state.c === 1 ? 2 : 1; this.updateTurnIndicator(); } 
+                        this.state.l = false; this.state.flipTimeout = null;
+                    }, 1200);
+                }
+            }
+        },
+        updateTurnIndicator() {
+             if (this.state.playerMode === 1) {
+                 if (this.dom.p1Display) this.dom.p1Display.classList.add('active'); 
+                 if (this.dom.p2Display) this.dom.p2Display.classList.remove('active');
+             } else {
+                 if (this.dom.p1Display) this.dom.p1Display.classList.toggle('active', this.state.c === 1);
+                 if (this.dom.p2Display) this.dom.p2Display.classList.toggle('active', this.state.c !== 1);
+             }
+         },
+         
+        // DEĞİŞİKLİK: Fonksiyon, sadece overlay'i göstermek için basitleştirildi.
+        showEndUI() {
+             if (!this.dom.gameOverContainer) return;
+             
+             // Metin ve ikon gösterme mantığı kaldırıldı.
+             
+             this.dom.gameOverContainer.classList.remove('hidden');
+         }
+    };
+
+
+    App.init();
+
+    });
+
+</script>
+</body>
+</html>
